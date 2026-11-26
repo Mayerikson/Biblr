@@ -1,0 +1,93 @@
+# Copie para config/pipeline.toml e ajuste. Segredos NUNCA ficam aqui: use variáveis de ambiente (.env).
+
+[geral]
+workspace = "workspace"          # pasta de trabalho (fora do Git)
+idioma = "pt-BR"
+modo_padrao = "DRY_RUN"          # DRY_RUN | LIVE. LIVE só com --live explícito na CLI.
+
+[video]
+largura = 1920
+altura = 1080
+fps = 25
+crf = 23
+preset = "veryfast"
+duracao_alvo_min = 20            # duração-alvo do vídeo em minutos
+palavras_por_minuto = 140        # ritmo médio de narração em PT-BR
+palavras_por_cena = 55           # ~20–25 s por imagem
+
+[roteiro]
+secoes_min = 6
+secoes_max = 8
+tolerancia_palavras = 0.35       # aceita ±35% em relação à duração-alvo
+traducao_biblica = "parafrase"   # cite referências; não copie trechos longos de traduções protegidas
+max_palavras_citacao = 25
+
+[llm]
+# Ordem de tentativa. Provedor que falhar é desligado pelo resto da execução (circuit breaker).
+cadeia = ["local", "gemini"]
+temperatura_roteiro = 0.7
+temperatura_storyboard = 0.3
+
+[llm.provedores.local]
+tipo = "openai_compat"           # Ollama, LM Studio, Groq, OpenRouter…
+base_url = "http://localhost:11434/v1"
+modelo = "qwen2.5:14b"
+api_key_env = ""                 # vazio = sem chave (local)
+custo_por_1k_tokens_brl = 0.0
+
+[llm.provedores.gemini]
+tipo = "gemini"
+modelo = "gemini-flash-latest"
+api_key_env = "GEMINI_API_KEY"
+custo_por_1k_tokens_brl = 0.002
+
+[llm.provedores.groq]
+tipo = "openai_compat"
+base_url = "https://api.groq.com/openai/v1"
+modelo = "openai/gpt-oss-20b"
+api_key_env = "GROQ_API_KEY"
+custo_por_1k_tokens_brl = 0.0
+
+[storyboard]
+usar_llm = true                  # LLM só descreve a composição; o plano é escolhido por regras. Falhou? segue com regras.
+
+[imagens]
+provedor = "placeholder"         # placeholder | externo | a1111
+estilo = "pintura digital cinematográfica, luz dramática, paleta terrosa, antigo Oriente Médio, sem texto na imagem"
+a1111_url = "http://127.0.0.1:7860"
+passos = 28
+
+# Ficha de personagens: garante consistência visual entre cenas.
+[personagens.davi]
+nomes = ["Davi"]
+descricao = "jovem pastor de ~17 anos, cabelos castanhos encaracolados, túnica simples bege, funda de couro"
+seed = 1017
+
+[personagens.golias]
+nomes = ["Golias"]
+descricao = "guerreiro filisteu gigantesco, armadura de bronze, lança enorme, elmo"
+seed = 2045
+
+[narracao]
+provedor = "silencio"            # silencio | externo | piper
+piper_modelo = ""                # caminho do .onnx do Piper
+
+[aprovacao]
+canal = "cli"                    # cli | telegram
+telegram_token_env = "TELEGRAM_BOT_TOKEN"
+telegram_chat_ids_env = "TELEGRAM_ALLOWED_CHAT_IDS"
+
+[publicacao]
+privacidade = "private"          # sempre privado; você agenda/publica após conferir
+categoria_id = "27"              # Educação
+client_secret = "config/client_secret.json"
+token_path = "workspace/youtube_token.json"
+
+# Orçamento por execução (bounded efficiency). Estourou → etapa BLOQUEADA com diagnóstico.
+[orcamento]
+max_chamadas_llm = 30
+max_tokens_estimados = 200000
+max_custo_brl = 5.0
+max_tentativas_por_etapa = 2
+max_cenas = 120
+max_segundos_execucao = 3600

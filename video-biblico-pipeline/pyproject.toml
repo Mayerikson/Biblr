@@ -1,0 +1,19 @@
+[project]
+name = "video-biblico-pipeline"
+version = "0.1.0"
+description = "Pipeline local-first para produzir vídeos bíblicos educativos (imagem + narração) com IA, revisão humana, observabilidade e orçamento limitado."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+imagens = ["Pillow>=10"]
+youtube = ["google-api-python-client>=2.100", "google-auth-oauthlib>=1.2"]
+dev = ["pytest>=8", "Pillow>=10"]
+
+[project.scripts]
+vbp = "vbp.cli:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

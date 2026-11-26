@@ -1,0 +1,5 @@
+# Thumbnail com texto e imagens de teste
+Pillow>=10
+# Publicação no YouTube (etapa PUBLICACAO em modo --live)
+google-api-python-client>=2.100
+google-auth-oauthlib>=1.2
