@@ -11,7 +11,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import sqlite3
+import unicodedata
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Iterator
@@ -185,6 +187,24 @@ class State:
         with self.conn() as c:
             c.execute("INSERT OR REPLACE INTO llm_cache(key,provider,model,response,created_at) VALUES (?,?,?,?,?)",
                       (key, provider, model, response, now_iso()))
+
+    def cache_delete(self, key: str) -> None:
+        with self.conn() as c:
+            c.execute("DELETE FROM llm_cache WHERE key=?", (key,))
+
+    def find_duplicate(self, titulo: str, referencias: str) -> str | None:
+        """ID de um episódio com o mesmo título ou o mesmo conjunto de referências (ignora acento/caixa)."""
+        def norm(text: str) -> str:
+            text = unicodedata.normalize("NFD", text.lower())
+            return " ".join(re.findall(r"\w+", "".join(c for c in text if unicodedata.category(c) != "Mn")))
+
+        def refs(text: str) -> list[str]:
+            return sorted(norm(r) for r in text.split(";") if norm(r))
+
+        for ep in self.episodes():
+            if norm(ep["titulo"]) == norm(titulo) or (refs(referencias) and refs(ep["referencias"]) == refs(referencias)):
+                return ep["id"]
+        return None
 
     # ---- kv ------------------------------------------------------------
     def kv_get(self, k: str, default: Any = None) -> Any:

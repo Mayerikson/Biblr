@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  testes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: video-biblico-pipeline
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Instalar ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - name: Instalar dependências de teste
+        run: pip install -r requirements-dev.txt
+      - name: Testes (offline, LLM fake, ffmpeg real)
+        run: python -m pytest -q
+      - name: Demo ponta a ponta
+        run: python scripts/vbp.py demo && python scripts/vbp.py demo

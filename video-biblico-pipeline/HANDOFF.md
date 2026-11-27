@@ -3,7 +3,7 @@
 > Documento de continuidade para qualquer pessoa ou IA (Claude, ChatGPT, Gemini, Codex, Cursor…) que assumir o projeto.
 > **Leia este arquivo inteiro antes de propor qualquer mudança.** Depois leia `AGENTS.md` e `docs/DECISIONS.md`.
 
-**Versão:** `0.1.0` (protótipo funcional) · **Data do handoff:** 2026-11-26 · **Idioma:** português do Brasil
+**Versão:** `0.2.0` (protótipo funcional) · **Data do handoff:** 2026-11-26 · **Idioma:** português do Brasil
 **Estado SDD:** PRD, TechSpec e plano em **rascunho — pendentes de aprovação do owner** (ver seção 9).
 
 ---
@@ -46,7 +46,7 @@ movimento de câmera, legendas e thumbnail → publicação no YouTube (privado/
 
 ## 4. Estado do desenvolvimento (honesto)
 
-### Implementado e testado (PASS — evidência: `python -m pytest` = 34 testes; `python scripts/vbp.py demo`)
+### Implementado e testado (PASS — evidência: `python -m pytest` = 50 testes; `python scripts/vbp.py demo`)
 - Estado em SQLite: episódios, eventos **append-only** (triggers impedem UPDATE/DELETE), artefatos com hash de entrada, aprovações, cache de LLM.
 - Camada de LLM portátil: `openai_compat` (Ollama/LM Studio/Groq/OpenRouter), `gemini`, `fake`; fallback com circuit breaker; cache por hash; extração robusta de JSON.
 - Roteiro: prompt com guia editorial, validação determinística (campos, 6–8 seções, referência por seção, livro/capítulo válidos, frases de isca proibidas, duração estimada), regeneração com feedback limitada a 2 tentativas, diagnóstico ao bloquear.
@@ -56,12 +56,15 @@ movimento de câmera, legendas e thumbnail → publicação no YouTube (privado/
 - Publicação em **DRY_RUN** (gera `publish_plan.json`); envio sempre `private` + `containsSyntheticMedia`.
 - Observabilidade: run_id, eventos JSONL + SQLite, `run_summary.json`, `*.explain.json`, `vbp report`, `vbp explain --timeline`, `vbp doctor`, redação de segredos.
 - Orçamento por execução (chamadas, tokens estimados, custo, tentativas, cenas, tempo) → BLOCKED com diagnóstico.
-- CI no GitHub Actions (testes + demo).
+- CI no GitHub Actions (`.github/workflows/ci.yml` na raiz do repositório). Execução no GitHub: NOT_RUN.
+- 0.2.0 (2026-11-27; `python -m pytest` = 50 testes; `demo` duas vezes seguidas; `independent: false`): cache de mídia por
+  conteúdo, proteção contra reenvio, `pronuncia`, `licencas.csv`, referências/créditos na descrição, validação do
+  agendamento e trava de tema repetido. Detalhes no CHANGELOG.
 
 ### Implementado, mas NOT_RUN (sem ambiente para testar aqui)
 - Chamada real a Ollama/LM Studio/Groq/Gemini (código pronto; testado só com provedor fake).
 - Provedor de imagens `a1111` (API Automatic1111/Forge) — confirmar payload com a sua versão.
-- Narração `piper` (TTS local).
+- Narração `piper` (TTS local) e `edge` (serviço online via `edge-tts`).
 - Upload real no YouTube (`--live`), thumbnail e legenda via API — exige OAuth do Google. Confirmar que o campo `status.containsSyntheticMedia` é aceito pela versão atual da API.
 - Telegram (`telegram-review` / `telegram-poll`).
 
@@ -79,7 +82,7 @@ vbp/            código (config, obs, budget, state, llm, bible_refs, script, st
 prompts/        editorial.md (regras do canal), roteiro.md, storyboard.md, revisao.md (checklist humano)
 config/         pipeline.example.toml (copie para pipeline.toml)
 data/           pauta.example.csv (5 episódios de exemplo)
-tests/          34 testes offline (unidade, integração, E2E com ffmpeg real)
+tests/          50 testes offline (unidade, integração, E2E com ffmpeg real)
 docs/           DECISIONS (ADRs), ARCHITECTURE, OBSERVABILITY, EFFICIENCY, RESEARCH, STRATEGY, REUSE, RUNBOOK
 tasks/prd-pipeline-video-v1/   prd.md, techspec.md, tasks.md (padrão SDD do owner)
 ```

@@ -42,6 +42,8 @@ def approve(state: State, ep_id: str, ep_dir: Path, approver: str, note: str = "
 
 
 def request_changes(state: State, ep_id: str, ep_dir: Path, approver: str, reason: str) -> None:
+    if not state.episode(ep_id) or not (ep_dir / "roteiro.json").exists():
+        raise ValueError(f"episódio {ep_id} não existe ou ainda não tem roteiro")
     state.record_approval(ep_id, "AJUSTE_SOLICITADO", approver, content_hash(ep_dir), reason)
     state.set_status(ep_id, "AJUSTE_SOLICITADO")
 
@@ -96,10 +98,18 @@ class Telegram:
             cmd, ep_id = parts[0].lower(), (parts[1].upper() if len(parts) > 1 else "")
             ep_dir = workspace / "episodios" / ep_id
             who = f"telegram:{chat}"
-            if cmd == "/aprovar" and ep_id:
-                approve(state, ep_id, ep_dir, who)
-                handled.append(f"{ep_id} aprovado")
-            elif cmd == "/ajustar" and ep_id:
-                request_changes(state, ep_id, ep_dir, who, parts[2] if len(parts) > 2 else "sem motivo")
-                handled.append(f"{ep_id} ajuste solicitado")
+            if cmd not in ("/aprovar", "/ajustar") or not ep_id:
+                continue
+            if not state.episode(ep_id):  # também impede que o texto recebido vire caminho de arquivo
+                handled.append(f"{ep_id[:20]}: episódio desconhecido")
+                continue
+            try:
+                if cmd == "/aprovar":
+                    approve(state, ep_id, ep_dir, who)
+                    handled.append(f"{ep_id} aprovado")
+                else:
+                    request_changes(state, ep_id, ep_dir, who, parts[2] if len(parts) > 2 else "sem motivo")
+                    handled.append(f"{ep_id} ajuste solicitado")
+            except ValueError as exc:
+                handled.append(f"{ep_id}: {exc}")
         return handled

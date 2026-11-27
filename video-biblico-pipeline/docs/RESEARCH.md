@@ -12,6 +12,10 @@ Resumo dos fatos que sustentam as decisões. Reverifique antes de decisões impo
   esforço; relatos indicam que criadores faceless legítimos também sentiram o efeito no alcance.
 - Implicação para o projeto: gate humano, roteiro com valor original, direção visual (storyboard) e zero isca emocional.
 
+- A partir de 01/02/2027, novos candidatos à receita de anúncios precisam de 8.000 horas em 365 dias ou 20 milhões de
+  views de Shorts em 90 dias (verificado em 27/11/2026):
+  https://blog.youtube/news-and-events/youtube-partner-program-updates-2027-new-opportunities-earn/
+
 ## Mercado
 - Censo 2022 (IBGE, divulgado em jun/2025): evangélicos = 26,9% da população com 10+ anos (47,4 milhões), contra 21,6% em 2010.
 - O nicho tem muita produção automatizada de baixa qualidade (devocional genérico, "mensagem de Deus pra você").

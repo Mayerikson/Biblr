@@ -69,8 +69,15 @@ descricao = "guerreiro filisteu gigantesco, armadura de bronze, lança enorme, e
 seed = 2045
 
 [narracao]
-provedor = "silencio"            # silencio | externo | piper
+provedor = "silencio"            # silencio | externo | piper | edge
+edge_voz = "pt-BR-AntonioNeural" # só para "edge" (pip install edge-tts; envia o texto a um serviço online)
 piper_modelo = ""                # caminho do .onnx do Piper
+
+# Como a VOZ deve ler certas palavras (a legenda não muda). Palavra inteira, com maiúsculas iguais.
+# Também dá para pôr "pronuncia" numa cena do storyboard.json (isso exige aprovar de novo).
+[pronuncia]
+# "Elá" = "Elah"
+# "Mefibosete" = "Mefibozéte"
 
 [aprovacao]
 canal = "cli"                    # cli | telegram

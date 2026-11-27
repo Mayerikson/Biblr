@@ -151,19 +151,20 @@ class LLMClient:
         self.providers, self.state, self.obs, self.budget = providers, state, obs, budget
         self.broken: set[str] = set()
 
-    def json(self, prompt: str, *, temperature: float, stage: str, episode: str | None = None) -> tuple[Any, dict]:
+    def json(self, prompt: str, *, temperature: float, stage: str, episode: str | None = None,
+             use_cache: bool = True) -> tuple[Any, dict]:
         """Retorna (dados, proveniência). Proveniência entra no .explain.json do artefato."""
         last_err = ""
         for idx, prov in enumerate(self.providers):
             if prov.name in self.broken:
                 continue
             key = sha256_text(prov.name, prov.model, f"{temperature:.2f}", prompt)
-            cached = self.state.cache_get(key)
+            cached = self.state.cache_get(key) if use_cache else None
             if cached is not None:
                 self.obs.count("llm_cache_hits")
                 self.obs.event("llm_cache_hit", episode=episode, stage=stage, provider=prov.name)
                 try:
-                    return extract_json(cached), {"provider": prov.name, "model": prov.model, "cache": True}
+                    return extract_json(cached), {"provider": prov.name, "model": prov.model, "cache": True, "key": key}
                 except LLMError:
                     pass  # cache corrompido: segue para chamada real
             tokens = estimate_tokens(prompt) + 2000  # entrada + margem de saída (ESTIMADO)
@@ -188,7 +189,7 @@ class LLMClient:
             self.state.cache_put(key, prov.name, prov.model, raw)
             self.obs.event("llm_call", episode=episode, stage=stage, provider=prov.name,
                            model=prov.model, tokens_est=tokens, cost_brl_est=round(cost, 4))
-            return data, {"provider": prov.name, "model": prov.model, "cache": False,
+            return data, {"provider": prov.name, "model": prov.model, "cache": False, "key": key,
                           "tokens_est": tokens, "cost_brl_est": round(cost, 4)}
         raise LLMError(f"todos os provedores falharam; último erro: {last_err or 'nenhum disponível'}")
 

@@ -3,7 +3,8 @@
 Provedores plugáveis, todos locais por padrão:
 - imagens: placeholder (teste), externo (você gera em qualquer ferramenta e solta os arquivos), a1111 (API do
   Automatic1111/Forge rodando na sua máquina).
-- narração: silencio (teste/tempo), externo (seus arquivos de áudio), piper (TTS local, se instalado).
+- narração: silencio (teste/tempo), externo (seus arquivos de áudio), piper (TTS local, se instalado),
+  edge (pacote edge-tts; o texto é enviado a um serviço online — leia os termos antes de monetizar).
 Cada cena tem SEU áudio → o vídeo e as legendas ficam sincronizados por construção.
 """
 from __future__ import annotations
@@ -11,12 +12,15 @@ from __future__ import annotations
 import base64
 import json
 import math
+import re
 import shutil
 import subprocess
 import urllib.request
 from pathlib import Path
 
+from .assets import Manifest
 from .obs import StageResult
+from .state import sha256_file, sha256_text
 
 IMG_EXT = (".png", ".jpg", ".jpeg", ".webp")
 AUD_EXT = (".wav", ".mp3", ".m4a", ".ogg")
@@ -66,16 +70,21 @@ def make_images(board: dict, ep_dir: Path, cfg) -> dict:
     w, h = int(cfg.get_path("video.largura")), int(cfg.get_path("video.altura"))
     made, reused = 0, 0
     missing = []
+    files = Manifest(folder)
     for sc in board["cenas"]:
         stem = scene_name(sc["id"])
-        if _find(folder, stem, IMG_EXT):
+        key = sha256_text(provider, sc["prompt_imagem"], str(sc["seed"]), f"{w}x{h}")
+        found = _find(folder, stem, IMG_EXT)
+        if found and files.reusable(stem, found, key):
             reused += 1
             continue
         if provider == "placeholder":
             _placeholder(folder / f"{stem}.png", w, h, f"Cena {sc['id']} - {sc['plano']}")
+            files.record(stem, folder / f"{stem}.png", key, generated=True)
             made += 1
         elif provider == "a1111":
             _a1111(folder / f"{stem}.png", sc, cfg)
+            files.record(stem, folder / f"{stem}.png", key, generated=True)
             made += 1
         else:  # externo
             missing.append(f"{stem}.png")
@@ -113,38 +122,71 @@ def _a1111(path: Path, scene: dict, cfg) -> None:
 
 
 # ------------------------------------------------------------------ narração
+def spoken_for_tts(scene: dict, dictionary: dict) -> str:
+    """Texto enviado à VOZ. A legenda continua usando scene['texto'].
+
+    Prioridade: campo `pronuncia` da cena no storyboard.json; senão o dicionário [pronuncia] do TOML
+    (palavra inteira, respeitando maiúsculas — nomes bíblicos são o caso comum).
+    """
+    if str(scene.get("pronuncia") or "").strip():
+        return str(scene["pronuncia"]).strip()
+    text = scene["texto"]
+    if not dictionary:
+        return text
+    words = sorted(dictionary, key=len, reverse=True)
+    pattern = rf"(?<!\w)({'|'.join(map(re.escape, words))})(?!\w)"
+    return re.sub(pattern, lambda mt: str(dictionary[mt.group(1)]), text)
+
+
 def make_narration(board: dict, ep_dir: Path, cfg) -> dict:
     folder = ep_dir / "audio"
     folder.mkdir(parents=True, exist_ok=True)
     provider = cfg.get_path("narracao.provedor", "silencio")
     wpm = float(cfg.get_path("video.palavras_por_minuto", 140))
+    dictionary = cfg.get_path("pronuncia", {}) or {}
     made, reused, missing = 0, 0, []
-    if provider == "piper" and not shutil.which("piper"):
-        raise StageResult("BLOCKED", "provedor 'piper' escolhido mas o executável 'piper' não está no PATH")
+    exe = {"piper": "piper", "edge": "edge-tts"}.get(provider)
+    if exe and not shutil.which(exe):
+        raise StageResult("BLOCKED", f"provedor '{provider}' escolhido mas o executável '{exe}' não está no PATH")
+    if provider not in ("silencio", "piper", "edge", "externo"):
+        raise StageResult("BLOCKED", f"provedor de narração desconhecido: '{provider}'")
+    texts = {sc["id"]: spoken_for_tts(sc, dictionary) for sc in board["cenas"]}
     (folder / "textos.json").write_text(json.dumps(
-        [{"arquivo": scene_name(s["id"]) + ".wav", "texto": s["texto"]} for s in board["cenas"]],
+        [{"arquivo": scene_name(s["id"]) + ".wav", "texto": texts[s["id"]]} for s in board["cenas"]],
         ensure_ascii=False, indent=2), encoding="utf-8")
+    voice = {"piper": cfg.get_path("narracao.piper_modelo", ""),
+             "edge": cfg.get_path("narracao.edge_voz", "pt-BR-AntonioNeural")}.get(provider, "")
+    files = Manifest(folder)
     for sc in board["cenas"]:
-        stem = scene_name(sc["id"])
-        if _find(folder, stem, AUD_EXT):
+        stem, text = scene_name(sc["id"]), texts[sc["id"]]
+        key = sha256_text(provider, str(voice), text, str(wpm) if provider == "silencio" else "")
+        found = _find(folder, stem, AUD_EXT)
+        if found and files.reusable(stem, found, key):
             reused += 1
             continue
-        target = folder / f"{stem}.wav"
+        target = folder / f"{stem}.{'mp3' if provider == 'edge' else 'wav'}"
         if provider == "silencio":
             require_ffmpeg()
-            dur = max(1.0, len(sc["texto"].split()) / wpm * 60)
+            dur = max(1.0, len(text.split()) / wpm * 60)
             run(["ffmpeg", "-y", "-loglevel", "error", "-f", "lavfi", "-i", "anullsrc=r=44100:cl=mono",
                  "-t", f"{dur:.2f}", str(target)])
-            made += 1
         elif provider == "piper":
-            model = cfg.get_path("narracao.piper_modelo", "")
-            proc = subprocess.run(["piper", "--model", model, "--output_file", str(target)],
-                                  input=sc["texto"], text=True, capture_output=True)
+            proc = subprocess.run(["piper", "--model", voice, "--output_file", str(target)],
+                                  input=text, text=True, encoding="utf-8", capture_output=True)
             if proc.returncode != 0:
+                target.unlink(missing_ok=True)
                 raise RuntimeError(f"piper falhou: {proc.stderr[-300:]}")
-            made += 1
+        elif provider == "edge":
+            try:
+                run(["edge-tts", "--voice", str(voice), f"--text={text}", "--write-media", str(target)])
+            except RuntimeError:
+                target.unlink(missing_ok=True)  # não deixar áudio pela metade
+                raise
         else:
             missing.append(f"{stem}.wav")
+            continue
+        files.record(stem, target, key, generated=True)
+        made += 1
     if missing:
         raise StageResult("BLOCKED", f"provedor 'externo': grave/gere a narração a partir de audio/textos.json e salve "
                                      f"{len(missing)} arquivo(s) em {folder} (ex.: {missing[0]})")
@@ -212,14 +254,18 @@ def render(board: dict, ep_dir: Path, cfg) -> dict:
         dur = probe_duration(aud)
         durations.append((sc["texto"], dur))
         out = clips / f"{stem}.mp4"
-        if out.exists() and out.stat().st_mtime >= max(img.stat().st_mtime, aud.stat().st_mtime):
-            continue  # clipe já renderizado e mais novo que as entradas
         motion = "dutch" if sc["plano"] == "dutch_angle" else sc["movimento"]
+        key = sha256_text(sha256_file(img), sha256_file(aud), motion, f"{w}x{h}", str(fps), crf, str(preset))
+        stamp = clips / f"{stem}.hash"
+        if out.exists() and stamp.exists() and stamp.read_text() == key:
+            continue  # clipe já renderizado com as mesmas entradas
+        stamp.unlink(missing_ok=True)
         vf = _motion_filter(motion, math.ceil(dur * fps), w, h, fps)
         run(["ffmpeg", "-y", "-loglevel", "error", "-i", str(img), "-i", str(aud),
              "-filter_complex", f"[0:v]{vf}[v]", "-map", "[v]", "-map", "1:a",
              "-c:v", "libx264", "-preset", preset, "-crf", crf, "-r", str(fps),
              "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-shortest", str(out)])
+        stamp.write_text(key)
     concat_list = clips / "lista.txt"
     concat_list.write_text("".join(f"file '{scene_name(s['id'])}.mp4'\n" for s in board["cenas"]), encoding="utf-8")
     raw = ep_dir / "video_sem_legenda.mp4"

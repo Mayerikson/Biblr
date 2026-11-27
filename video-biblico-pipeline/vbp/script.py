@@ -64,6 +64,13 @@ def validate_script(script: dict, cfg) -> list[dict]:
     if not isinstance(script, dict):
         add("formato_json", False, "resposta não é um objeto JSON")
         return checks
+    raw = script.get("secoes") or []
+    texts_ok = all(isinstance(script.get(k, ""), str) for k in ("gancho", "conclusao", "descricao_youtube"))
+    if not texts_ok or not isinstance(raw, list) or not all(
+            isinstance(s, dict) and isinstance(s.get("texto", ""), str) for s in raw):
+        add("formato_json", False, "gancho/conclusao/descricao_youtube devem ser texto e secoes uma lista de "
+                                   "objetos com 'texto'")
+        return checks
     required = ["titulo", "texto_thumbnail", "gancho", "secoes", "conclusao", "descricao_youtube"]
     missing = [k for k in required if not script.get(k)]
     add("campos_obrigatorios", not missing, f"faltando: {missing}" if missing else "")
