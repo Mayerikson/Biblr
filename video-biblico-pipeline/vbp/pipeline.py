@@ -95,9 +95,11 @@ class Pipeline:
                               self._prompt_files_hash("roteiro.md", "editorial.md"),
                               self._cfg_hash("roteiro", "video.duracao_alvo_min", "video.palavras_por_minuto"))
         feedback = ""
+        human = False
         last = self.state.latest_approval(ep["id"])
         if last and last["decision"] == "AJUSTE_SOLICITADO" and last["content_hash"] == approval.content_hash(d):
             feedback = f"- Pedido do revisor humano: {last.get('note')}"  # ajuste humano força nova versão
+            human = True
         elif self.state.is_fresh(ep["id"], "ROTEIRO", in_hash):
             raise StageResult("SKIPPED", "roteiro já existe para as mesmas entradas")
         attempts = []
@@ -106,7 +108,8 @@ class Pipeline:
             prompt = script_mod.build_prompt(ep, self.cfg, feedback)
             try:
                 data, prov = self.llm.json(prompt, temperature=float(self.cfg.get_path("llm.temperatura_roteiro", 0.7)),
-                                           stage="ROTEIRO", episode=ep["id"])
+                                           stage="ROTEIRO", episode=ep["id"],
+                                           use_cache=not (human and attempt == 1))
             except LLMError as exc:
                 raise StageResult("BLOCKED", f"LLM indisponível: {exc}") from exc
             checks = script_mod.validate_script(data, self.cfg)
@@ -120,6 +123,8 @@ class Pipeline:
                                         "feedback_humano": feedback or None,
                                         "palavras": script_mod.word_count(script_mod.full_text(data))})
                 return
+            if prov.get("key"):
+                self.state.cache_delete(prov["key"])  # resposta reprovada não pode voltar do cache
             feedback = "\n".join(f"- {c['check']}: {c['detail']}" for c in bad)
             if attempt < max_try:
                 self.obs.count("retries")
@@ -150,7 +155,7 @@ class Pipeline:
                                            stage="STORYBOARD", episode=ep["id"])
                 n = sb_mod.apply_llm_descriptions(board, desc, self.cfg.get_path("imagens.estilo", ""))
                 explain["llm_descricoes"] = {"cenas_atualizadas": n, "proveniencia": prov}
-            except (LLMError, BudgetExceeded) as exc:  # degradação graciosa: regras continuam valendo
+            except (LLMError, BudgetExceeded, AttributeError, TypeError, ValueError) as exc:  # degradação graciosa: regras continuam valendo
                 explain["llm_descricoes"] = f"falhou, mantidas descrições por regra: {exc}"
         path = d / "storyboard.json"
         path.write_text(json.dumps(board, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -200,9 +205,17 @@ class Pipeline:
         ok, why = approval.is_approved(self.state, ep["id"], d)
         if not ok:  # defesa em profundidade: nunca publica sem aprovação válida
             raise StageResult("BLOCKED", f"publicação exige aprovação válida: {why}")
-        plan = publish.publish(d, self.cfg, live=self.live, publish_at=publish_at)
+        key = f"youtube_video:{ep['id']}"
+        sent = self.state.kv_get(key)
+        if sent:  # nunca envia o mesmo episódio duas vezes
+            self.state.set_status(ep["id"], "PUBLICADO")
+            raise StageResult("SKIPPED", f"episódio já enviado ao YouTube: {sent}")
+        plan = publish.publish(d, self.cfg, live=self.live, publish_at=publish_at,
+                               on_uploaded=lambda vid: self.state.kv_set(key, vid))
         if plan.get("video_id"):
             self.state.set_status(ep["id"], "PUBLICADO")
             info["reason"] = f"enviado como privado/agendado: {plan['video_id']}"
         else:
             info["reason"] = "DRY_RUN: publish_plan.json gerado; nada foi enviado"
+            if plan.get("pendencias_licenca"):
+                info["reason"] += f" ({len(plan['pendencias_licenca'])} licença(s) pendente(s); --live será bloqueado)"

@@ -3,3 +3,5 @@ Pillow>=10
 # Publicação no YouTube (etapa PUBLICACAO em modo --live)
 google-api-python-client>=2.100
 google-auth-oauthlib>=1.2
+# Narração com provedor "edge" (opcional; leia os termos antes de monetizar)
+edge-tts>=7

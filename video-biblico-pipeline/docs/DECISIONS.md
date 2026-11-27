@@ -91,3 +91,21 @@ e o que mudaria a decisão. Status: `PROPOSTA` (aguarda owner), `ACEITA`, `SUBST
 - **Decisão:** núcleo sem dependências; Pillow e Google API opcionais; nada de Airflow/Kafka/runtime de agentes.
 - **Justificativa:** roda em qualquer máquina, fácil de manter sozinho, fácil de outra IA entender.
 - **Aprovador:** owner — `PROPOSTA`.
+
+## ADR-014 — Cache de mídia por conteúdo, sem apagar arquivos
+- **Decisão:** `manifesto.json` guarda hash da entrada e do arquivo; mídia velha vai para `_antigos/`; envio ao YouTube é registrado e não se repete.
+- **Justificativa:** o nome `cena_NNN` não identifica o texto; áudio antigo podia narrar um roteiro novo.
+- **Trade-offs:** arquivos de workspaces anteriores são tratados como externos (pedem licença antes de `--live`). Reenviar um episódio de propósito exige um novo ID.
+- **Aprovador:** owner — `PROPOSTA`.
+
+## ADR-015 — Licença registrada para mídia externa
+- **Decisão:** `licencas.csv` obrigatório no `--live` para arquivos não gerados pelo pipeline; NC e ND recusados.
+- **Limitação:** o código não confere se a licença declarada é verdadeira.
+- **Aprovador:** owner — `PROPOSTA`.
+
+## ADR-016 — Voz `edge` opcional, desligada por padrão
+- **Opções:** só `piper` (local); `edge-tts` (online); serviço pago.
+- **Decisão:** oferecer `edge` como opção; o padrão continua `silencio`.
+- **Risco:** o texto sai da máquina e o `edge-tts` não é, até onde se sabe, um canal oficial da Microsoft; verificar termos antes de uso comercial.
+- **Aprovador:** owner — `PROPOSTA`.
+

@@ -40,7 +40,7 @@ python scripts/vbp.py report
 ## Testes
 ```bash
 pip install -r requirements-dev.txt
-python -m pytest -q        # 34 testes offline (LLM fake, ffmpeg real)
+python -m pytest -q        # 50 testes offline (LLM fake, ffmpeg real)
 ```
 
 ## Documentação

@@ -74,7 +74,12 @@ def cmd_doctor(cfg, args) -> int:
 
 
 def cmd_add(cfg, args) -> int:
-    ok = _state(cfg).add_episode(args.id.upper(), args.titulo, args.tema, args.referencias, args.personagens or "")
+    st = _state(cfg)
+    dup = None if st.episode(args.id.upper()) else st.find_duplicate(args.titulo, args.referencias)
+    if dup and not args.forcar:
+        print(f"tema repetido: mesmo título ou referências de {dup}. Use --forcar se for intencional.")
+        return 1
+    ok = st.add_episode(args.id.upper(), args.titulo, args.tema, args.referencias, args.personagens or "")
     print("inserido" if ok else "já existia (nada alterado)")
     return 0
 
@@ -83,8 +88,13 @@ def cmd_import(cfg, args) -> int:
     st, n_new, n_old = _state(cfg), 0, 0
     with open(args.csv, encoding="utf-8") as fh:
         for row in csv.DictReader(fh):
-            if st.add_episode(row["id"].strip().upper(), row["titulo"].strip(), row["tema"].strip(),
-                              row["referencias"].strip(), row.get("personagens", "").strip()):
+            ep_id = row["id"].strip().upper()
+            dup = None if st.episode(ep_id) else st.find_duplicate(row["titulo"], row["referencias"])
+            if dup and not args.forcar:
+                print(f"{ep_id}: ignorado, tema repetido de {dup} (--forcar para importar)")
+                continue
+            if st.add_episode(ep_id, row["titulo"].strip(), row["tema"].strip(),
+                              row["referencias"].strip(), (row.get("personagens") or "").strip()):
                 n_new += 1
             else:
                 n_old += 1
@@ -186,6 +196,7 @@ def cmd_demo(cfg, args) -> int:
         "video": {"largura": 640, "altura": 360, "fps": 15, "duracao_alvo_min": 1, "palavras_por_cena": 30},
         "imagens": {"provedor": "placeholder"}, "narracao": {"provedor": "silencio"},
     })
+    shutil.rmtree(demo_cfg.workspace, ignore_errors=True)  # a demo sempre começa do zero
     pipe = Pipeline(demo_cfg, providers=[FakeProvider(__import__("vbp.demo", fromlist=["responder"]).responder)])
     pipe.state.add_episode("DEMO01", "Davi e Golias: a coragem que vem da confiança", "coragem e fé",
                            "1 Samuel 17:4-11; 1 Samuel 17:32-37; 1 Samuel 17:45-47", "Davi; Golias")
@@ -211,8 +222,9 @@ def main(argv: list[str] | None = None) -> int:
     a = sub.add_parser("add", help="adiciona um episódio à pauta")
     a.add_argument("id"); a.add_argument("--titulo", required=True); a.add_argument("--tema", required=True)
     a.add_argument("--referencias", required=True, help="separe por ';'"); a.add_argument("--personagens")
+    a.add_argument("--forcar", action="store_true", help="adiciona mesmo se o tema repetir")
     i = sub.add_parser("import-pauta", help="importa episódios de um CSV (id,titulo,tema,referencias,personagens)")
-    i.add_argument("csv")
+    i.add_argument("csv"); i.add_argument("--forcar", action="store_true", help="importa mesmo se o tema repetir")
     sub.add_parser("status", help="lista episódios, status e aprovação")
     r = sub.add_parser("run", help="executa o pipeline")
     r.add_argument("--episode", "-e"); r.add_argument("--until", help="para após esta etapa (ex.: STORYBOARD)")
