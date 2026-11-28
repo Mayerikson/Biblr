@@ -19,4 +19,4 @@ Continuar o projeto
 2. [HANDOFF.md](video-biblico-pipeline/HANDOFF.md) para estado técnico, pendências e próximos passos.
 3. [AGENTS.md](video-biblico-pipeline/AGENTS.md) antes de alterar o código. A revisão humana é obrigatória antes da geração de mídia e da publicação.
 4. [Decisões técnicas](video-biblico-pipeline/docs/DECISIONS.md) e [changelog](video-biblico-pipeline/CHANGELOG.md) para entender as escolhas e o histórico.
-Ao concluir uma mudança relevante, atualize o handoff com o que mudou, os testes realmente executados e as pendências.
+**Para quem for continuar o projeto, inclusive com IA:** leia o [AGENTS.md](video-biblico-pipeline/AGENTS.md) antes de editar. Em cada entrega relevante, atualize o [HANDOFF.md](video-biblico-pipeline/HANDOFF.md) no mesmo commit com o que mudou, o que foi testado e a próxima pendência.
