@@ -28,3 +28,14 @@ remoção/afrouxamento de qualquer invariante acima.
 Use `PASS`, `FAIL`, `BLOCKED`, `NOT_RUN`, `NOT_APPLICABLE`. Liste arquivos alterados, comandos realmente executados,
 resultados, riscos residuais. Separe **medido**, **estimado** e **não medido**. Se só um agente implementou e revisou,
 declare `independent: false`. Justificativas concisas e alternativas consideradas — sem expor raciocínio privado.
+
+
+## Continuidade do projeto
+
+Ao concluir uma alteração relevante, atualize o `HANDOFF.md` desta pasta no mesmo commit da entrega. Registre:
+
+- **O que mudou** e por quê.
+- **O que foi verificado**, com os comandos executados e os resultados observados. Use `NOT_RUN` para verificações que ficaram pendentes.
+- **O que falta fazer**, com a próxima ação concreta e qualquer bloqueio conhecido.
+
+Ao começar uma nova tarefa, leia o `HANDOFF.md` para entender o estado do projeto e confirme as informações relevantes no código atual.
